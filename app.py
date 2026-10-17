@@ -637,29 +637,36 @@ def get_nurse_review_items(row: pd.Series, risk_data: dict) -> list:
     return items
 
 # ---------------------------------------------------------
-# INTERACTIVE PLOTLY VISUALIZATIONS
+# REALISTIC CLINICAL TELEMETRY PLOTLY VISUALIZATIONS
 # ---------------------------------------------------------
 def build_trend_chart(hist_df: pd.DataFrame, metric_col: str, title: str, unit: str, 
                       ref_low: float = None, ref_high: float = None, 
-                      line_color: str = "#0D9488") -> go.Figure:
+                      line_color: str = "#0D9488", fill_rgba: str = "rgba(13, 148, 136, 0.10)",
+                      safe_corridor: tuple = None, danger_zone: tuple = None) -> go.Figure:
     """
-    Builds a responsive, accessible Plotly time-series chart
-    showing observations from Hour 1 through the selected Hour only.
-    Prevents data leakage into future hours.
+    Builds an authentic, hospital bedside monitor-grade time-series chart:
+    - Smooth biological spline curves
+    - Translucent illuminated gradient glow fill
+    - Shaded physiological safe corridors (green) & danger zones (red)
+    - Active observation beacon marker on latest bedside reading
+    - Hospital monitor-grade typography and tooltips
     """
     fig = go.Figure()
     
-    # Main trend line
-    fig.add_trace(go.Scatter(
-        x=hist_df["Hour"],
-        y=hist_df[metric_col],
-        mode="lines+markers",
-        name=title,
-        line=dict(color=line_color, width=2.5),
-        marker=dict(size=6, color=line_color, symbol="circle"),
-        hovertemplate=f"<b>Hour %{{x}}</b><br>{title}: %{{y}} {unit}<extra></extra>"
-    ))
-    
+    # Safe physiological target corridor shading (layer="below")
+    if safe_corridor is not None:
+        fig.add_hrect(
+            y0=safe_corridor[0], y1=safe_corridor[1],
+            fillcolor="rgba(16, 185, 129, 0.08)", line_width=0, layer="below"
+        )
+        
+    # Danger / Hypoxemia / Ischemia zone shading
+    if danger_zone is not None:
+        fig.add_hrect(
+            y0=danger_zone[0], y1=danger_zone[1],
+            fillcolor="rgba(239, 68, 68, 0.08)", line_width=0, layer="below"
+        )
+        
     # Reference thresholds
     if ref_low is not None:
         fig.add_hline(
@@ -674,11 +681,48 @@ def build_trend_chart(hist_df: pd.DataFrame, metric_col: str, title: str, unit: 
             annotation_font_size=10, annotation_font_color="#DC2626"
         )
         
+    # Main trend line with natural biological spline curve & area illumination
+    fig.add_trace(go.Scatter(
+        x=hist_df["Hour"],
+        y=hist_df[metric_col],
+        mode="lines+markers",
+        name=title,
+        line=dict(color=line_color, width=2.8, shape="spline", smoothing=0.85),
+        fill="tozeroy",
+        fillcolor=fill_rgba,
+        marker=dict(size=5, color=line_color, symbol="circle"),
+        hovertemplate=f"<b>Hour %{{x}}:00</b><br>{title}: <b>%{{y:.1f}} {unit}</b><extra></extra>"
+    ))
+    
+    # Active Bedside Beacon Marker on the latest hour
+    if not hist_df.empty:
+        latest_val = hist_df.iloc[-1][metric_col]
+        latest_hr = hist_df.iloc[-1]["Hour"]
+        
+        # Outer pulsing halo
+        fig.add_trace(go.Scatter(
+            x=[latest_hr], y=[latest_val],
+            mode="markers",
+            marker=dict(size=14, color="rgba(255,255,255,0)", line=dict(color=line_color, width=2.5), symbol="circle"),
+            hoverinfo="skip", showlegend=False
+        ))
+        # Inner core
+        fig.add_trace(go.Scatter(
+            x=[latest_hr], y=[latest_val],
+            mode="markers",
+            marker=dict(size=7, color=line_color, symbol="circle"),
+            hoverinfo="skip", showlegend=False
+        ))
+        
+        chart_title = f"<b>{title}</b> &nbsp; <span style='color:{line_color}; font-weight:800; font-size:15px;'>{latest_val:.1f}</span> <span style='font-size:11px; color:#64748B;'>{unit}</span>"
+    else:
+        chart_title = f"<b>{title}</b> <span style='font-size:12px; color:#64748B;'>({unit})</span>"
+        
     # Layout styling
     fig.update_layout(
-        title=dict(text=f"<b>{title}</b> <span style='font-size:12px; color:#64748B;'>({unit})</span>", font=dict(size=14, color="#0F172A")),
+        title=dict(text=chart_title, font=dict(size=14, color="#0F172A")),
         xaxis=dict(
-            title="Ward Timeline (Hour)",
+            title="Ward Observation Timeline (Hour)",
             dtick=2 if len(hist_df) > 8 else 1,
             range=[0.5, max(hist_df["Hour"].max() + 0.5, 2.5)],
             gridcolor="#F1F5F9",
@@ -688,10 +732,159 @@ def build_trend_chart(hist_df: pd.DataFrame, metric_col: str, title: str, unit: 
             gridcolor="#F1F5F9",
             zeroline=False
         ),
-        height=220,
-        margin=dict(l=40, r=20, t=35, b=35),
+        height=230,
+        margin=dict(l=40, r=20, t=40, b=35),
         plot_bgcolor="#FFFFFF",
         paper_bgcolor="#FFFFFF",
+        showlegend=False
+    )
+    return fig
+
+def build_hemodynamics_envelope_chart(hist_df: pd.DataFrame) -> go.Figure:
+    """
+    Hospital Arterial Hemodynamics Envelope chart showing Systolic (SBP),
+    Diastolic (DBP), shaded Pulse Pressure corridor, and Mean Arterial Pressure (MAP).
+    """
+    fig = go.Figure()
+    
+    # Adequate MAP corridor (>=65 mmHg)
+    fig.add_hrect(y0=65, y1=105, fillcolor="rgba(16, 185, 129, 0.06)", line_width=0, layer="below")
+    fig.add_hline(y=65, line_dash="dash", line_color="#EF4444", line_width=1.2, annotation_text="Target MAP ≥65", annotation_font_size=10, annotation_font_color="#DC2626")
+    
+    # SBP Line (Upper bound)
+    fig.add_trace(go.Scatter(
+        x=hist_df["Hour"], y=hist_df["SBP"],
+        mode="lines", name="Systolic (SBP)",
+        line=dict(color="#8B5CF6", width=2.0, shape="spline", smoothing=0.85),
+        hovertemplate="Hour %{x}:00 — SBP: <b>%{y:.0f} mmHg</b><extra></extra>"
+    ))
+    
+    # DBP Line (Lower bound) with fill to SBP (Pulse Pressure Corridor)
+    fig.add_trace(go.Scatter(
+        x=hist_df["Hour"], y=hist_df["DBP"],
+        mode="lines", name="Diastolic (DBP)",
+        line=dict(color="#A78BFA", width=2.0, shape="spline", smoothing=0.85),
+        fill="tonexty", fillcolor="rgba(139, 92, 246, 0.12)",
+        hovertemplate="Hour %{x}:00 — DBP: <b>%{y:.0f} mmHg</b><extra></extra>"
+    ))
+    
+    # MAP Line (Center solid arterial track)
+    fig.add_trace(go.Scatter(
+        x=hist_df["Hour"], y=hist_df["MAP"],
+        mode="lines+markers", name="MAP",
+        line=dict(color="#6D28D9", width=3.2, shape="spline", smoothing=0.85),
+        marker=dict(size=6, color="#6D28D9"),
+        hovertemplate="Hour %{x}:00 — MAP: <b>%{y:.1f} mmHg</b><extra></extra>"
+    ))
+    
+    # Latest reading beacon
+    if not hist_df.empty:
+        last_row = hist_df.iloc[-1]
+        fig.add_trace(go.Scatter(
+            x=[last_row["Hour"]], y=[last_row["MAP"]],
+            mode="markers", marker=dict(size=14, color="rgba(255,255,255,0)", line=dict(color="#6D28D9", width=2.5)),
+            hoverinfo="skip", showlegend=False
+        ))
+        latest_text = f"<span style='color:#6D28D9; font-weight:800; font-size:15px;'>{last_row['SBP']:.0f}/{last_row['DBP']:.0f}</span> <span style='font-size:12px; color:#64748B;'>(MAP {last_row['MAP']:.0f} mmHg)</span>"
+        chart_title = f"<b>Hemodynamic Arterial Envelope (SBP / MAP / DBP)</b> &nbsp; {latest_text}"
+    else:
+        chart_title = "<b>Hemodynamic Arterial Envelope (SBP / MAP / DBP)</b>"
+        
+    fig.update_layout(
+        title=dict(text=chart_title, font=dict(size=14, color="#0F172A")),
+        xaxis=dict(title="Ward Observation Timeline (Hour)", dtick=2 if len(hist_df) > 8 else 1, gridcolor="#F1F5F9"),
+        yaxis=dict(title="Pressure (mmHg)", gridcolor="#F1F5F9"),
+        height=230,
+        margin=dict(l=40, r=20, t=40, b=35),
+        plot_bgcolor="#FFFFFF", paper_bgcolor="#FFFFFF",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    return fig
+
+def build_shock_index_chart(hist_df: pd.DataFrame) -> go.Figure:
+    """
+    Shock Index Trajectory (HR / SBP) with physiological reference corridor:
+    - Normal (0.50 - 0.70): Soft green corridor
+    - Warning threshold (0.70 - 0.90): Amber zone
+    - Circulatory Shock (> 0.90): Red alert zone
+    """
+    fig = go.Figure()
+    
+    # Physiological corridors
+    fig.add_hrect(y0=0.50, y1=0.70, fillcolor="rgba(16, 185, 129, 0.08)", line_width=0, layer="below")
+    fig.add_hrect(y0=0.70, y1=0.90, fillcolor="rgba(245, 158, 11, 0.08)", line_width=0, layer="below")
+    fig.add_hrect(y0=0.90, y1=1.60, fillcolor="rgba(239, 68, 68, 0.10)", line_width=0, layer="below")
+    
+    fig.add_hline(y=0.70, line_dash="dot", line_color="#D97706", line_width=1.2, annotation_text="Upper Normal (0.70)", annotation_font_size=10, annotation_font_color="#D97706")
+    fig.add_hline(y=0.90, line_dash="dash", line_color="#DC2626", line_width=1.5, annotation_text="Shock Warning (0.90)", annotation_font_size=10, annotation_font_color="#DC2626")
+    
+    fig.add_trace(go.Scatter(
+        x=hist_df["Hour"], y=hist_df["Shock_Index"],
+        mode="lines+markers", name="Shock Index",
+        line=dict(color="#D97706", width=2.8, shape="spline", smoothing=0.85),
+        fill="tozeroy", fillcolor="rgba(217, 119, 6, 0.10)",
+        marker=dict(size=6, color="#D97706"),
+        hovertemplate="Hour %{x}:00 — Shock Index: <b>%{y:.3f}</b><extra></extra>"
+    ))
+    
+    if not hist_df.empty:
+        last_row = hist_df.iloc[-1]
+        fig.add_trace(go.Scatter(
+            x=[last_row["Hour"]], y=[last_row["Shock_Index"]],
+            mode="markers", marker=dict(size=14, color="rgba(255,255,255,0)", line=dict(color="#D97706", width=2.5)),
+            hoverinfo="skip", showlegend=False
+        ))
+        latest_si = last_row["Shock_Index"]
+        si_color = "#DC2626" if latest_si >= 0.90 else ("#D97706" if latest_si >= 0.70 else "#059669")
+        chart_title = f"<b>Shock Index (HR / SBP)</b> &nbsp; <span style='color:{si_color}; font-weight:800; font-size:15px;'>{latest_si:.2f}</span>"
+    else:
+        chart_title = "<b>Shock Index (HR / SBP)</b>"
+        
+    fig.update_layout(
+        title=dict(text=chart_title, font=dict(size=14, color="#0F172A")),
+        xaxis=dict(title="Ward Observation Timeline (Hour)", dtick=2 if len(hist_df) > 8 else 1, gridcolor="#F1F5F9"),
+        yaxis=dict(title="Ratio (bpm/mmHg)", range=[0.40, max(hist_df["Shock_Index"].max() + 0.15, 1.15)], gridcolor="#F1F5F9"),
+        height=230,
+        margin=dict(l=40, r=20, t=40, b=35),
+        plot_bgcolor="#FFFFFF", paper_bgcolor="#FFFFFF",
+        showlegend=False
+    )
+    return fig
+
+def build_risk_trajectory_chart(hist_df: pd.DataFrame) -> go.Figure:
+    """
+    Composite Deterioration Risk Score Trajectory (0 - 100%)
+    showing clinical evolution from Green to Yellow to Red across time.
+    """
+    scores = [calculate_risk_score(r)["score"] for _, r in hist_df.iterrows()]
+    
+    fig = go.Figure()
+    fig.add_hrect(y0=0, y1=30, fillcolor="rgba(16, 185, 129, 0.08)", line_width=0, layer="below")
+    fig.add_hrect(y0=30, y1=65, fillcolor="rgba(245, 158, 11, 0.08)", line_width=0, layer="below")
+    fig.add_hrect(y0=65, y1=100, fillcolor="rgba(239, 68, 68, 0.08)", line_width=0, layer="below")
+    
+    fig.add_hline(y=30, line_dash="dot", line_color="#D97706", line_width=1.0, annotation_text="Moderate Risk (30%)", annotation_font_size=10, annotation_font_color="#D97706")
+    fig.add_hline(y=65, line_dash="dash", line_color="#DC2626", line_width=1.5, annotation_text="High Risk Trigger (65%)", annotation_font_size=10, annotation_font_color="#DC2626")
+    
+    fig.add_trace(go.Scatter(
+        x=hist_df["Hour"], y=scores,
+        mode="lines+markers", name="Risk Score",
+        line=dict(color="#0F172A", width=3.0, shape="spline", smoothing=0.85),
+        fill="tozeroy", fillcolor="rgba(15, 23, 42, 0.08)",
+        marker=dict(size=6, color="#0F172A"),
+        hovertemplate="Hour %{x}:00 — Risk Score: <b>%{y:.1f}%</b><extra></extra>"
+    ))
+    
+    latest_score = scores[-1] if scores else 0.0
+    latest_color = "#DC2626" if latest_score > 65 else ("#D97706" if latest_score >= 30 else "#059669")
+    
+    fig.update_layout(
+        title=dict(text=f"<b>Composite Deterioration Risk Score Trajectory</b> &nbsp; <span style='color:{latest_color}; font-weight:800; font-size:15px;'>{latest_score:.1f}%</span>", font=dict(size=14, color="#0F172A")),
+        xaxis=dict(title="Ward Observation Timeline (Hour)", dtick=2 if len(hist_df) > 8 else 1, gridcolor="#F1F5F9"),
+        yaxis=dict(title="Risk Index (%)", range=[0, 100], gridcolor="#F1F5F9"),
+        height=230,
+        margin=dict(l=40, r=20, t=40, b=35),
+        plot_bgcolor="#FFFFFF", paper_bgcolor="#FFFFFF",
         showlegend=False
     )
     return fig
@@ -1128,32 +1321,78 @@ def render_patient_detail(p_row: pd.Series, hist_p_df: pd.DataFrame):
         
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Time-Series Trajectory Section
-    st.markdown("### 📈 Multivariate Trajectories (Hour 1 to Current Hour)")
+    # ---------------------------------------------------------
+    # REALISTIC HOSPITAL MULTI-PARAMETRIC TELEMETRY WAVEFORMS
+    # ---------------------------------------------------------
+    st.markdown("### 📈 Physiological Telemetry & Longitudinal Waves")
     st.markdown(
         f"""
-        <p style="font-size:0.85rem; color:#64748B; margin-top:-0.3rem;">
-            Plotting historical observations through <strong>Hour {st.session_state.sim_hour}:00</strong> only. 
-            Notice how Bed 4 demonstrates multivariate trend convergence beginning around Hour 10 before individual single-parameter thresholds trip.
+        <p style="font-size:0.85rem; color:#64748B; margin-top:-0.3rem; margin-bottom:0.8rem;">
+            Continuous hospital-grade telemetry visualizer for <strong>Bed {bed_num}</strong> through <strong>Hour {st.session_state.sim_hour}:00</strong>.
+            Biological spline curves with shaded physiological corridors and active beacon markers.
         </p>
         """,
         unsafe_allow_html=True
     )
     
-    c_ch1, c_ch2 = st.columns(2)
-    with c_ch1:
-        fig_hr = build_trend_chart(hist_p_df, "HR", "Heart Rate", "bpm", ref_low=60.0, ref_high=100.0, line_color="#0D9488")
-        st.plotly_chart(fig_hr, use_container_width=True)
-        
-        fig_spo2 = build_trend_chart(hist_p_df, "SpO2", "Oxygen Saturation", "%", ref_low=94.0, line_color="#3B82F6")
-        st.plotly_chart(fig_spo2, use_container_width=True)
-        
-    with c_ch2:
-        fig_map = build_trend_chart(hist_p_df, "MAP", "Mean Arterial Pressure", "mmHg", ref_low=65.0, line_color="#8B5CF6")
-        st.plotly_chart(fig_map, use_container_width=True)
-        
-        fig_lac = build_trend_chart(hist_p_df, "Lactate", "Serum Lactate", "mmol/L", ref_high=2.0, line_color="#EF4444")
-        st.plotly_chart(fig_lac, use_container_width=True)
+    tab_waves, tab_hemo, tab_risk = st.tabs([
+        "🫀 Multi-Lead Vital Telemetry (4-Panel)",
+        "🩸 Hemodynamic Arterial Envelope & Shock Index",
+        "📊 Composite Deterioration Risk Trajectory (0–100%)"
+    ])
+    
+    with tab_waves:
+        c_ch1, c_ch2 = st.columns(2)
+        with c_ch1:
+            # Heart Rate: Vivid Emerald with safe sinus corridor (60 - 100 bpm)
+            fig_hr = build_trend_chart(
+                hist_p_df, "HR", "Heart Rate (ECG)", "bpm",
+                ref_low=60.0, ref_high=100.0,
+                line_color="#10B981", fill_rgba="rgba(16, 185, 129, 0.12)",
+                safe_corridor=(60.0, 100.0)
+            )
+            st.plotly_chart(fig_hr, use_container_width=True)
+            
+            # SpO2: Electric Sky Blue with target oxygenation corridor (>= 94%) and hypoxemia danger zone (< 90%)
+            fig_spo2 = build_trend_chart(
+                hist_p_df, "SpO2", "Oxygen Saturation (SpO2)", "%",
+                ref_low=94.0,
+                line_color="#0284C7", fill_rgba="rgba(2, 132, 199, 0.12)",
+                safe_corridor=(94.0, 100.0), danger_zone=(75.0, 90.0)
+            )
+            st.plotly_chart(fig_spo2, use_container_width=True)
+            
+        with c_ch2:
+            # MAP: Royal Amethyst with safe perfusion corridor (>= 65 mmHg) and ischemic danger zone (< 65 mmHg)
+            fig_map = build_trend_chart(
+                hist_p_df, "MAP", "Mean Arterial Pressure (MAP)", "mmHg",
+                ref_low=65.0,
+                line_color="#8B5CF6", fill_rgba="rgba(139, 92, 246, 0.12)",
+                safe_corridor=(65.0, 110.0), danger_zone=(40.0, 65.0)
+            )
+            st.plotly_chart(fig_map, use_container_width=True)
+            
+            # Serum Lactate: Crimson with hyperlactatemia danger zone (>= 2.0 mmol/L)
+            fig_lac = build_trend_chart(
+                hist_p_df, "Lactate", "Serum Lactate (Metabolic)", "mmol/L",
+                ref_high=2.0,
+                line_color="#EF4444", fill_rgba="rgba(239, 68, 68, 0.12)",
+                safe_corridor=(0.4, 2.0), danger_zone=(2.0, 4.0)
+            )
+            st.plotly_chart(fig_lac, use_container_width=True)
+            
+    with tab_hemo:
+        c_h1, c_h2 = st.columns(2)
+        with c_h1:
+            fig_env = build_hemodynamics_envelope_chart(hist_p_df)
+            st.plotly_chart(fig_env, use_container_width=True)
+        with c_h2:
+            fig_si = build_shock_index_chart(hist_p_df)
+            st.plotly_chart(fig_si, use_container_width=True)
+            
+    with tab_risk:
+        fig_r_traj = build_risk_trajectory_chart(hist_p_df)
+        st.plotly_chart(fig_r_traj, use_container_width=True)
 
 # ---------------------------------------------------------
 # DATA EXPLORER & SYSTEM VALIDATION SECTION

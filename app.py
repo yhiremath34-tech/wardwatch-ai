@@ -169,14 +169,14 @@ CUSTOM_CSS = """
 # CLINICAL PROFILES & DESCRIPTIONS
 # ---------------------------------------------------------
 PATIENT_METADATA = {
-    1: {"id": "WW-001", "name": "Arthur Pendelton", "age": 64, "gender": "Male", "scenario": "Stable", "admit": "Post-cholecystectomy Day 2", "desc": "Expected recovery path, normal physiological vitals."},
-    2: {"id": "WW-002", "name": "Elena Rostova", "age": 52, "gender": "Female", "scenario": "Stable", "admit": "Cellulitis on IV Cefazolin", "desc": "Good therapeutic response, afebrile, stable hemodynamics."},
-    3: {"id": "WW-003", "name": "Marcus Vance", "age": 71, "gender": "Male", "scenario": "Stable", "admit": "Elective total hip arthroplasty", "desc": "Routine post-op monitoring, vitals consistently within limits."},
-    4: {"id": "WW-004", "name": "David Harrison", "age": 68, "gender": "Male", "scenario": "Progressive deterioration", "admit": "Post-op sigmoid colectomy Day 3", "desc": "Subtle occult deterioration starting ~Hr 10. Progressive tachycardia, declining BP/MAP, widening Shock Index, and rising serum lactate."},
-    5: {"id": "WW-005", "name": "Beatrice Campbell", "age": 79, "gender": "Female", "scenario": "High-risk respiratory", "admit": "COPD exacerbation with atelectasis", "desc": "Elevated and fluctuating respiratory rate (frequently ≥ 22/min), borderline hypotension, elevated qSOFA (vital criteria)."},
-    6: {"id": "WW-006", "name": "Carlos Gomez", "age": 45, "gender": "Male", "scenario": "Post-operative recovery", "admit": "Laparoscopic appendectomy Day 1", "desc": "Mild early postoperative tachycardia gradually settling down."},
-    7: {"id": "WW-007", "name": "Sunita Patel", "age": 61, "gender": "Female", "scenario": "Post-operative recovery", "admit": "Right hemicolectomy Day 2", "desc": "Low-grade reactive temperature resolving with oral fluids and ambulation."},
-    8: {"id": "WW-008", "name": "Gregory Smith", "age": 58, "gender": "Male", "scenario": "Post-operative recovery", "admit": "Ventral hernia repair Day 1", "desc": "Normal post-surgical convalescence, hemodynamically stable."}
+    1: {"id": "WW-001", "name": "Arthur Pendelton", "age": 64, "gender": "Male", "scenario": "Normal / Stable 🟢", "admit": "Post-cholecystectomy Day 2", "desc": "Routine post-surgical convalescence, afebrile, stable sinus rhythm, normal oxygenation."},
+    2: {"id": "WW-002", "name": "Elena Rostova", "age": 52, "gender": "Female", "scenario": "Moderate Risk / Watchlist 🟡", "admit": "Cellulitis with SIRS (IV Cefazolin)", "desc": "Active systemic inflammatory response: persistent pyrexia 38.3°C, mild sinus tachycardia (HR ~101 bpm), tachypnea (RR ~22/min), leukocytosis."},
+    3: {"id": "WW-003", "name": "Marcus Vance", "age": 71, "gender": "Male", "scenario": "Normal / Stable 🟢", "admit": "Elective total hip arthroplasty", "desc": "Routine post-op monitoring, vitals consistently within limits, pain well controlled."},
+    4: {"id": "WW-004", "name": "David Harrison", "age": 68, "gender": "Male", "scenario": "Serious / Deteriorating 🔴", "admit": "Post-op sigmoid colectomy Day 3", "desc": "Occult septic deterioration starting ~Hr 10. Progressive tachycardia, severe hypotension, Shock Index > 1.0, hyperlactatemia (>3.2 mmol/L)."},
+    5: {"id": "WW-005", "name": "Beatrice Campbell", "age": 79, "gender": "Female", "scenario": "Serious / Respiratory Failure 🔴", "admit": "Severe COPD exacerbation & atelectasis", "desc": "Marked respiratory exhaustion with persistent tachypnea (RR ~27/min), hypoxemia (SpO2 ~89%), borderline hypotension (SBP 93 mmHg), elevated qSOFA."},
+    6: {"id": "WW-006", "name": "Carlos Gomez", "age": 45, "gender": "Male", "scenario": "Normal / Stable 🟢", "admit": "Laparoscopic appendectomy Day 1", "desc": "Normal post-operative trajectory, ambulating, stable hemodynamics and afebrile."},
+    7: {"id": "WW-007", "name": "Sunita Patel", "age": 61, "gender": "Female", "scenario": "Moderate Risk / Watchlist 🟡", "admit": "Right hemicolectomy Day 2", "desc": "Moderate post-operative hypovolemia and fluid deficit: reactive tachycardia (HR ~98 bpm), borderline tachypnea (RR ~22), low-grade fever (38.2°C)."},
+    8: {"id": "WW-008", "name": "Gregory Smith", "age": 58, "gender": "Male", "scenario": "Normal / Stable 🟢", "admit": "Ventral hernia repair Day 1", "desc": "Normal post-surgical recovery, normotensive, eupneic, hemodynamically stable."}
 }
 
 # ---------------------------------------------------------
@@ -202,21 +202,42 @@ def generate_synthetic_data() -> pd.DataFrame:
             
             timestamp = f"{((7 + h) % 24):02d}:00"
             
-            if bed_num in (1, 2, 3):
-                # Beds 1-3: Stable
-                hr = 70.0 + (bed_num - 2) * 2.0 + r1 * 2.2
-                sbp = 120.0 + (bed_num - 2) * 2.5 + r2 * 3.0
-                dbp = 76.0 + (bed_num - 2) * 1.5 + r1 * 1.8
-                spo2 = 98.0 - abs(r2) * 0.8
-                temp = 36.8 + r1 * 0.15
-                rr = 15.0 + (bed_num - 2) * 0.5 + r2 * 1.0
-                lactate = 1.1 + (bed_num - 2) * 0.1 + abs(r1) * 0.15
-                wbc = 7.4 + (bed_num - 2) * 0.5 + r2 * 0.3
+            if bed_num == 1:
+                # Bed 1: Normal / Stable (Post-op Cholecystectomy)
+                hr = 70.0 + r1 * 2.0
+                sbp = 120.0 + r2 * 2.5
+                dbp = 76.0 + r1 * 1.8
+                spo2 = 98.0 - abs(r2) * 0.6
+                temp = 36.8 + r1 * 0.12
+                rr = 15.0 + r2 * 0.8
+                lactate = 1.1 + abs(r1) * 0.1
+                wbc = 7.2 + r2 * 0.3
+                
+            elif bed_num == 2:
+                # Bed 2: Moderate Risk / SIRS Watchlist (Cellulitis)
+                hr = 101.0 + r1 * 2.0
+                sbp = 108.0 + r2 * 2.0
+                dbp = 66.0 + r1 * 1.5
+                spo2 = 94.6 + r2 * 0.4
+                temp = 38.3 + r1 * 0.1
+                rr = 22.4 + r2 * 0.5
+                lactate = 2.05 + abs(r1) * 0.08
+                wbc = 13.6 + r2 * 0.4
+                
+            elif bed_num == 3:
+                # Bed 3: Normal / Stable (Total Hip Arthroplasty)
+                hr = 72.0 + r1 * 2.0
+                sbp = 122.0 + r2 * 2.5
+                dbp = 78.0 + r1 * 1.8
+                spo2 = 98.2 - abs(r2) * 0.6
+                temp = 36.7 + r1 * 0.12
+                rr = 15.5 + r2 * 0.8
+                lactate = 1.15 + abs(r1) * 0.1
+                wbc = 7.5 + r2 * 0.3
                 
             elif bed_num == 4:
-                # Bed 4: Progressive deterioration starting around hour 10
+                # Bed 4: Serious / Progressive Deterioration (Sigmoid Colectomy leak)
                 if h < 10:
-                    # Stable baseline
                     hr = 74.0 + r1 * 2.0
                     sbp = 122.0 + r2 * 2.5
                     dbp = 78.0 + r1 * 2.0
@@ -226,70 +247,61 @@ def generate_synthetic_data() -> pd.DataFrame:
                     lactate = 1.1 + abs(r1) * 0.1
                     wbc = 8.6 + r2 * 0.2
                 else:
-                    # Smooth sigmoidal/exponential escalation from hr 10 to 24
                     prog = (h - 9) / 15.0 # 0.067 to 1.0
-                    
-                    # HR rises toward 112 bpm
                     hr = 74.0 + (38.0 * (prog ** 1.15)) + r1 * 1.8
-                    # SBP drops from 122 down to ~94 mmHg
                     sbp = 122.0 - (28.0 * (prog ** 1.05)) + r2 * 2.0
-                    # DBP drops from 78 down to ~58 mmHg
                     dbp = 78.0 - (20.0 * (prog ** 1.0)) + r1 * 1.5
-                    # SpO2 degrades gradually from 98% down to 92%
                     spo2 = 98.0 - (6.0 * (prog ** 1.1)) - abs(r2) * 0.5
-                    # Temp rises (fever developing: 37.0 -> 38.6 °C)
                     temp = 37.0 + (1.6 * (prog ** 1.1)) + r1 * 0.1
-                    # RR increases (tachypnea: 16 -> 25 breaths/min)
                     rr = 16.0 + (9.5 * (prog ** 1.1)) + r2 * 0.8
-                    # Lactate climbs progressively: 1.1 -> 3.25 mmol/L
                     lactate = 1.1 + (2.15 * (prog ** 1.2)) + abs(r1) * 0.08
-                    # WBC climbs: 8.6 -> 15.4 x10^3/uL
                     wbc = 8.6 + (6.8 * (prog ** 1.1)) + r2 * 0.3
                     
             elif bed_num == 5:
-                # Bed 5: High-risk respiratory scenario (persistent/fluctuating tachypnea & borderline SBP)
-                # RR fluctuates at or above 22/min frequently
-                rr = 23.5 + 2.5 * np.sin(h * 0.9) + r2 * 1.0
-                # SBP intermittently dips to/below 100 mmHg
-                sbp = 101.0 - 5.0 * np.cos(h * 0.7) + r1 * 2.0
-                dbp = 64.0 + r2 * 2.0
-                hr = 92.0 + 4.0 * np.sin(h * 0.5) + r1 * 2.5
-                spo2 = 92.5 + 1.2 * np.cos(h * 0.6)
-                temp = 37.5 + r1 * 0.2
-                lactate = 1.8 + abs(r2) * 0.25
-                wbc = 12.2 + r1 * 0.4
+                # Bed 5: Serious / High-Risk Respiratory (Severe COPD Exacerbation)
+                rr = 26.6 + 1.2 * np.sin(h * 0.8) + r2 * 0.6
+                sbp = 93.0 - 2.5 * np.cos(h * 0.6) + r1 * 1.5
+                dbp = 58.0 + r2 * 1.5
+                hr = 106.0 + 3.0 * np.sin(h * 0.5) + r1 * 2.0
+                spo2 = 89.4 + 1.2 * np.cos(h * 0.7)
+                temp = 37.8 + r1 * 0.2
+                lactate = 2.4 + abs(r2) * 0.2
+                wbc = 13.8 + r1 * 0.4
                 
-            else: # Beds 6, 7, 8: Post-operative recovery
-                # Mild initial postoperative reaction settling into calm baseline
+            elif bed_num == 6:
+                # Bed 6: Normal / Post-operative Recovery (Appendectomy)
                 decay = np.exp(-(h - 1) / 7.0)
+                hr = 74.0 + 4.0 * decay + r1 * 1.5
+                sbp = 120.0 + r2 * 2.0
+                dbp = 76.0 + r1 * 1.5
+                spo2 = 98.0 + r2 * 0.3
+                temp = 36.8 + r1 * 0.1
+                rr = 15.0 + decay * 1.0 + r2 * 0.5
+                lactate = 1.1 + abs(r1) * 0.08
+                wbc = 8.2 + r2 * 0.2
                 
-                if bed_num == 6: # Appendectomy
-                    hr = 74.0 + 12.0 * decay + r1 * 1.5
-                    sbp = 118.0 + 4.0 * (1 - decay) + r2 * 2.0
-                    dbp = 74.0 + r1 * 1.5
-                    spo2 = 97.5 + r2 * 0.4
-                    temp = 36.9 + 0.4 * decay + r1 * 0.1
-                    rr = 16.0 + 2.0 * decay + r2 * 0.6
-                    lactate = 1.3 - 0.2 * (1 - decay) + abs(r1) * 0.08
-                    wbc = 9.8 - 1.8 * (1 - decay) + r2 * 0.2
-                elif bed_num == 7: # Hemicolectomy
-                    hr = 76.0 + 8.0 * decay + r1 * 1.6
-                    sbp = 116.0 + r2 * 2.5
-                    dbp = 72.0 + r1 * 1.4
-                    spo2 = 96.8 + 1.0 * (1 - decay)
-                    temp = 37.4 * decay + 36.8 * (1 - decay) + r1 * 0.12
-                    rr = 17.0 + 1.5 * decay + r2 * 0.7
-                    lactate = 1.4 - 0.25 * (1 - decay) + abs(r1) * 0.09
-                    wbc = 10.5 - 2.0 * (1 - decay) + r2 * 0.25
-                else: # Hernia repair
-                    hr = 72.0 + 6.0 * decay + r1 * 1.2
-                    sbp = 122.0 + r2 * 2.0
-                    dbp = 76.0 + r1 * 1.5
-                    spo2 = 98.2 - abs(r2) * 0.4
-                    temp = 36.7 + r1 * 0.1
-                    rr = 15.0 + decay * 1.0 + r2 * 0.5
-                    lactate = 1.0 + abs(r1) * 0.1
-                    wbc = 7.8 + r2 * 0.2
+            elif bed_num == 7:
+                # Bed 7: Moderate Risk / Fluid Deficit SIRS Watchlist (Hemicolectomy)
+                hr = 98.0 + 1.5 * np.sin(h * 0.6) + r1 * 1.5
+                sbp = 110.0 + r2 * 2.0
+                dbp = 68.0 + r1 * 1.5
+                spo2 = 94.6 + r2 * 0.3
+                temp = 38.2 + r1 * 0.1
+                rr = 22.4 + r2 * 0.4
+                lactate = 2.05 + abs(r1) * 0.08
+                wbc = 12.8 + r2 * 0.3
+                
+            else:
+                # Bed 8: Normal / Stable (Hernia repair)
+                decay = np.exp(-(h - 1) / 7.0)
+                hr = 72.0 + 3.0 * decay + r1 * 1.2
+                sbp = 122.0 + r2 * 2.0
+                dbp = 76.0 + r1 * 1.5
+                spo2 = 98.4 - abs(r2) * 0.3
+                temp = 36.7 + r1 * 0.1
+                rr = 14.5 + r2 * 0.5
+                lactate = 1.0 + abs(r1) * 0.08
+                wbc = 7.6 + r2 * 0.2
             
             # Clamp to physiologically valid non-negative ranges
             hr = max(40.0, round(float(hr), 1))

@@ -739,9 +739,25 @@ def build_risk_gauge(score: float, band: str) -> go.Figure:
     return fig
 
 # ---------------------------------------------------------
+# STATE MUTATION CALLBACKS (RESOLVES BUTTON SYNC CONFLICTS)
+# ---------------------------------------------------------
+def set_sim_hour(h: int):
+    """Callback to reliably update the simulation hour across all components."""
+    st.session_state.sim_hour = int(h)
+
+def set_selected_bed(b: int):
+    """Callback to reliably update the active patient bed selection."""
+    st.session_state.selected_bed = int(b)
+
+def set_milestone(h: int, b: int = 4):
+    """Callback to set both simulation hour and patient bed in lockstep."""
+    st.session_state.sim_hour = int(h)
+    st.session_state.selected_bed = int(b)
+
+# ---------------------------------------------------------
 # SIDEBAR NAVIGATION & SIMULATION TIMELINE CONTROLS
 # ---------------------------------------------------------
-def render_sidebar(full_df: pd.DataFrame, current_ward_df: pd.DataFrame):
+def render_sidebar(full_df: pd.DataFrame):
     with st.sidebar:
         st.markdown(
             """
@@ -762,39 +778,45 @@ def render_sidebar(full_df: pd.DataFrame, current_ward_df: pd.DataFrame):
         
         st.markdown("### ⏱️ Timeline Control")
         
-        # Hour Slider
-        selected_h = st.slider(
+        # Primary Hour Slider directly linked to st.session_state.sim_hour
+        st.slider(
             "Ward Simulation Hour",
             min_value=1,
             max_value=24,
-            value=st.session_state.sim_hour,
-            help="Adjust to observe physiological trajectories across the 24-hour ward stay.",
-            key="hour_slider"
+            key="sim_hour",
+            help="Adjust to observe physiological trajectories across the 24-hour ward stay."
         )
-        st.session_state.sim_hour = selected_h
         
-        # Timeline step buttons (Prev / Next)
+        # Timeline step buttons (Prev / Next) with deterministic on_click callbacks
         col_prev, col_next = st.columns(2)
         with col_prev:
-            if st.button("◀ Prev Hour", use_container_width=True, disabled=(st.session_state.sim_hour <= 1)):
-                st.session_state.sim_hour = max(1, st.session_state.sim_hour - 1)
-                st.rerun()
+            st.button(
+                "◀ Prev Hour",
+                key="btn_prev_hour",
+                use_container_width=True,
+                disabled=(st.session_state.sim_hour <= 1),
+                on_click=set_sim_hour,
+                args=(max(1, st.session_state.sim_hour - 1),)
+            )
         with col_next:
-            if st.button("Next Hour ▶", use_container_width=True, disabled=(st.session_state.sim_hour >= 24)):
-                st.session_state.sim_hour = min(24, st.session_state.sim_hour + 1)
-                st.rerun()
+            st.button(
+                "Next Hour ▶",
+                key="btn_next_hour",
+                use_container_width=True,
+                disabled=(st.session_state.sim_hour >= 24),
+                on_click=set_sim_hour,
+                args=(min(24, st.session_state.sim_hour + 1),)
+            )
                 
-        # Ward Census Quick Stats
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("### 📊 Ward Census Snapshot")
+        # Ward Census Quick Stats (Computed dynamically for active simulation hour)
+        current_hour_df = full_df[full_df["Hour"] == st.session_state.sim_hour]
         
-        # Calculate census counts
         high_risk_count = 0
         mod_risk_count = 0
         stable_count = 0
         urgent_count = 0
         
-        for _, r in current_ward_df.iterrows():
+        for _, r in current_hour_df.iterrows():
             calc = calculate_risk_score(r)
             if calc["urgent_alert"]:
                 urgent_count += 1
@@ -805,6 +827,9 @@ def render_sidebar(full_df: pd.DataFrame, current_ward_df: pd.DataFrame):
             else:
                 stable_count += 1
                 
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("### 📊 Ward Census Snapshot")
+        
         st.metric("Total Monitored Beds", "8 Beds")
         col_c1, col_c2 = st.columns(2)
         with col_c1:
@@ -822,28 +847,16 @@ def render_sidebar(full_df: pd.DataFrame, current_ward_df: pd.DataFrame):
             unsafe_allow_html=True
         )
         
-        # Reset / Jump to Demo Milestones
+        # Reset / Jump to Demo Milestones using on_click callbacks
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("### 🎯 Demo Milestones")
         col_m1, col_m2 = st.columns(2)
         with col_m1:
-            if st.button("Baseline (Hr 1)", use_container_width=True):
-                st.session_state.sim_hour = 1
-                st.session_state.selected_bed = 4
-                st.rerun()
-            if st.button("Midway (Hr 15)", use_container_width=True):
-                st.session_state.sim_hour = 15
-                st.session_state.selected_bed = 4
-                st.rerun()
+            st.button("Baseline (Hr 1)", key="btn_ms_h1", use_container_width=True, on_click=set_milestone, args=(1, 4))
+            st.button("Midway (Hr 15)", key="btn_ms_h15", use_container_width=True, on_click=set_milestone, args=(15, 4))
         with col_m2:
-            if st.button("Inception (Hr 10)", use_container_width=True):
-                st.session_state.sim_hour = 10
-                st.session_state.selected_bed = 4
-                st.rerun()
-            if st.button("Critical (Hr 24)", use_container_width=True):
-                st.session_state.sim_hour = 24
-                st.session_state.selected_bed = 4
-                st.rerun()
+            st.button("Inception (Hr 10)", key="btn_ms_h10", use_container_width=True, on_click=set_milestone, args=(10, 4))
+            st.button("Critical (Hr 24)", key="btn_ms_h24", use_container_width=True, on_click=set_milestone, args=(24, 4))
                 
         # Mandatory Synthetic Data & Clinical Disclaimer
         st.markdown("<br><hr style='margin:0 0 0.8rem 0; border:0; border-top:1px solid #E2E8F0;'>", unsafe_allow_html=True)
@@ -922,11 +935,16 @@ def render_patient_card(row: pd.Series, is_selected: bool):
     """
     st.markdown(card_html, unsafe_allow_html=True)
     
-    # Stable select button
+    # Stable select button using on_click callback
     btn_label = "Active Patient" if is_selected else f"Select Bed {bed_num}"
-    if st.button(btn_label, key=f"select_bed_{bed_num}", use_container_width=True, type="primary" if is_selected else "secondary"):
-        st.session_state.selected_bed = bed_num
-        st.rerun()
+    st.button(
+        btn_label,
+        key=f"select_bed_{bed_num}",
+        use_container_width=True,
+        type="primary" if is_selected else "secondary",
+        on_click=set_selected_bed,
+        args=(bed_num,)
+    )
 
 # ---------------------------------------------------------
 # PATIENT DEEP DIVE SECTION
@@ -964,18 +982,14 @@ def render_patient_detail(p_row: pd.Series, hist_p_df: pd.DataFrame):
             unsafe_allow_html=True
         )
     with col_hdr2:
-        # Quick quick action: jump to other beds
+        # Quick action: jump to adjacent beds with on_click callbacks
         prev_bed = 8 if bed_num == 1 else bed_num - 1
         next_bed = 1 if bed_num == 8 else bed_num + 1
         c_p, c_n = st.columns(2)
         with c_p:
-            if st.button(f"◀ Bed {prev_bed}", use_container_width=True):
-                st.session_state.selected_bed = prev_bed
-                st.rerun()
+            st.button(f"◀ Bed {prev_bed}", key=f"nav_prev_bed_{bed_num}", use_container_width=True, on_click=set_selected_bed, args=(prev_bed,))
         with c_n:
-            if st.button(f"Bed {next_bed} ▶", use_container_width=True):
-                st.session_state.selected_bed = next_bed
-                st.rerun()
+            st.button(f"Bed {next_bed} ▶", key=f"nav_next_bed_{bed_num}", use_container_width=True, on_click=set_selected_bed, args=(next_bed,))
                 
     # Urgent alert banner if triggered
     if risk_info["urgent_alert"]:
@@ -1086,13 +1100,14 @@ def render_patient_detail(p_row: pd.Series, hist_p_df: pd.DataFrame):
         checklist_items = get_nurse_review_items(p_row, risk_info)
         
         for item in checklist_items:
-            key = f"chk_{bed_num}_{item['id']}_{st.session_state.sim_hour}"
+            # Key persisted per bed so nurse actions remain recorded during bedside workflow
+            key = f"chk_{bed_num}_{item['id']}"
             current_val = st.session_state.checklist_state.get(key, False)
             
             checked = st.checkbox(
                 f"**{item['title']}** — {item['detail']}",
                 value=current_val,
-                key=key
+                key=f"cb_{key}"
             )
             st.session_state.checklist_state[key] = checked
             
@@ -1263,11 +1278,11 @@ def main():
     # 3. Derive clinical metrics & trend windows
     full_df = calculate_derived_metrics(raw_df)
     
-    # 4. Filter current hour ward view
-    current_ward_df = full_df[full_df["Hour"] == st.session_state.sim_hour].copy()
+    # 4. Render Sidebar controls FIRST so any button/slider callbacks resolve before main view rendering
+    render_sidebar(full_df)
     
-    # 5. Render Sidebar controls & census
-    render_sidebar(full_df, current_ward_df)
+    # 5. Filter current hour ward view using guaranteed up-to-date session state
+    current_ward_df = full_df[full_df["Hour"] == st.session_state.sim_hour].copy()
     
     # 6. Top Header Banner
     st.markdown(

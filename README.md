@@ -1,10 +1,15 @@
 # WardWatch AI — Silent Deterioration & Early Warning Engine
 ### Prototype Clinical Decision Support System (CDSS) for Non-ICU Hospital Wards
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Online-brightgreen.svg?style=for-the-badge&logo=cloudflare)](https://marble-hall-qualifying-courses.trycloudflare.com)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
 [![Streamlit 1.35+](https://img.shields.io/badge/streamlit-1.35+-FF4B4B.svg)](https://streamlit.io/)
 [![Plotly](https://img.shields.io/badge/plotly-interactive-3F4F75.svg)](https://plotly.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+> 🌐 **Interactive Live Public Deployment:** [https://marble-hall-qualifying-courses.trycloudflare.com](https://marble-hall-qualifying-courses.trycloudflare.com)
+> 
+> *Directly accessible on any desktop, tablet, or smartphone without installation.*
 
 ---
 
